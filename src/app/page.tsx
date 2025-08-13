@@ -1,103 +1,154 @@
-import Image from "next/image";
+"use client"
 
-export default function Home() {
+import { useEffect, useState } from "react"
+import { AddTodoForm } from "@/components/add-todo-form"
+import { ConnectionStatus } from "@/components/connection-status"
+import { TodoList } from "@/components/todo-list"
+import { useToast } from "@/hooks/use-toast"
+import type { Todo } from "@/lib/db/schema"
+import { useSocket } from "@/lib/hooks/use-socket"
+
+export default function HomePage() {
+  const [todos, setTodos] = useState<Todo[]>([])
+  const [isLoadingTodos, setIsLoadingTodos] = useState(true)
+  const { socket, isConnected, isLoading, error, reconnect } = useSocket()
+  const { toast } = useToast()
+
+  useEffect(() => {
+    if (!socket) return
+
+    // Request initial todos when connected
+    if (isConnected) {
+      socket.emit("getTodos")
+    }
+
+    // Listen for todo events
+    socket.on("todosLoaded", (loadedTodos) => {
+      setTodos(loadedTodos)
+      setIsLoadingTodos(false)
+    })
+
+    socket.on("todoAdded", (newTodo) => {
+      setTodos((prev) => [...prev, newTodo])
+      toast({
+        title: "Todo added",
+        description: `"${newTodo.title}" has been added to your list.`
+      })
+    })
+
+    socket.on("todoUpdated", (updatedTodo) => {
+      setTodos((prev) =>
+        prev.map((todo) => (todo.id === updatedTodo.id ? updatedTodo : todo))
+      )
+      toast({
+        title: "Todo updated",
+        description: `"${updatedTodo.title}" has been updated.`
+      })
+    })
+
+    socket.on("todoDeleted", (deletedId) => {
+      setTodos((prev) => {
+        const deletedTodo = prev.find((todo) => todo.id === deletedId)
+        if (deletedTodo) {
+          toast({
+            title: "Todo deleted",
+            description: `"${deletedTodo.title}" has been removed from your list.`
+          })
+        }
+        return prev.filter((todo) => todo.id !== deletedId)
+      })
+    })
+
+    return () => {
+      socket.off("todosLoaded")
+      socket.off("todoAdded")
+      socket.off("todoUpdated")
+      socket.off("todoDeleted")
+    }
+  }, [socket, isConnected, toast])
+
+  // Reset loading state when connection is lost
+  useEffect(() => {
+    if (!isConnected && !isLoading) {
+      setIsLoadingTodos(true)
+    }
+  }, [isConnected, isLoading])
+
+  const handleAddTodo = (data: { title: string; description?: string }) => {
+    if (socket && isConnected) {
+      socket.emit("addTodo", data)
+    } else {
+      toast({
+        title: "Connection error",
+        description: "Unable to add todo. Please check your connection.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleUpdateTodo = (
+    id: number,
+    data: { title?: string; description?: string; completed?: boolean }
+  ) => {
+    if (socket && isConnected) {
+      // Optimistic update
+      setTodos((prev) =>
+        prev.map((todo) => (todo.id === id ? { ...todo, ...data } : todo))
+      )
+      socket.emit("updateTodo", { id, ...data })
+    } else {
+      toast({
+        title: "Connection error",
+        description: "Unable to update todo. Please check your connection.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleDeleteTodo = (id: number) => {
+    if (socket && isConnected) {
+      socket.emit("deleteTodo", id)
+    } else {
+      toast({
+        title: "Connection error",
+        description: "Unable to delete todo. Please check your connection.",
+        variant: "destructive"
+      })
+    }
+  }
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto max-w-2xl px-4 py-8">
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="space-y-2 text-center">
+            <h1 className="font-bold text-3xl tracking-tight">
+              Real-time Todos
+            </h1>
+            <p className="text-muted-foreground">
+              Manage your tasks with live updates across all devices
+            </p>
+            <ConnectionStatus
+              isConnected={isConnected}
+              isLoading={isLoading}
+              error={error}
+              onReconnect={reconnect}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          </div>
+
+          {/* Add Todo Form */}
+          <AddTodoForm onAdd={handleAddTodo} />
+
+          {/* Todo List */}
+          <TodoList
+            todos={todos}
+            onUpdate={handleUpdateTodo}
+            onDelete={handleDeleteTodo}
+            isLoading={isLoadingTodos && isLoading}
+          />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
     </div>
-  );
+  )
 }
