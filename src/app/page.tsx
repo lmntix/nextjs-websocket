@@ -1,10 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { toast } from "sonner"
 import { AddTodoForm } from "@/components/add-todo-form"
 import { ConnectionStatus } from "@/components/connection-status"
 import { TodoList } from "@/components/todo-list"
-import { useToast } from "@/hooks/use-toast"
 import type { Todo } from "@/lib/db/schema"
 import { useSocket } from "@/lib/hooks/use-socket"
 
@@ -12,7 +12,6 @@ export default function HomePage() {
   const [todos, setTodos] = useState<Todo[]>([])
   const [isLoadingTodos, setIsLoadingTodos] = useState(true)
   const { socket, isConnected, isLoading, error, reconnect } = useSocket()
-  const { toast } = useToast()
 
   useEffect(() => {
     if (!socket) return
@@ -30,30 +29,23 @@ export default function HomePage() {
 
     socket.on("todoAdded", (newTodo) => {
       setTodos((prev) => [...prev, newTodo])
-      toast({
-        title: "Todo added",
-        description: `"${newTodo.title}" has been added to your list.`
-      })
+      toast.success(`"${newTodo.title}" has been added to your list.`)
     })
 
     socket.on("todoUpdated", (updatedTodo) => {
       setTodos((prev) =>
         prev.map((todo) => (todo.id === updatedTodo.id ? updatedTodo : todo))
       )
-      toast({
-        title: "Todo updated",
-        description: `"${updatedTodo.title}" has been updated.`
-      })
+      toast.success(`"${updatedTodo.title}" has been updated.`)
     })
 
     socket.on("todoDeleted", (deletedId) => {
       setTodos((prev) => {
         const deletedTodo = prev.find((todo) => todo.id === deletedId)
         if (deletedTodo) {
-          toast({
-            title: "Todo deleted",
-            description: `"${deletedTodo.title}" has been removed from your list.`
-          })
+          toast.success(
+            `"${deletedTodo.title}" has been removed from your list.`
+          )
         }
         return prev.filter((todo) => todo.id !== deletedId)
       })
@@ -78,11 +70,7 @@ export default function HomePage() {
     if (socket && isConnected) {
       socket.emit("addTodo", data)
     } else {
-      toast({
-        title: "Connection error",
-        description: "Unable to add todo. Please check your connection.",
-        variant: "destructive"
-      })
+      toast.error("Unable to add todo. Please check your connection.")
     }
   }
 
@@ -97,11 +85,7 @@ export default function HomePage() {
       )
       socket.emit("updateTodo", { id, ...data })
     } else {
-      toast({
-        title: "Connection error",
-        description: "Unable to update todo. Please check your connection.",
-        variant: "destructive"
-      })
+      toast.error("Unable to update todo. Please check your connection.")
     }
   }
 
@@ -109,11 +93,7 @@ export default function HomePage() {
     if (socket && isConnected) {
       socket.emit("deleteTodo", id)
     } else {
-      toast({
-        title: "Connection error",
-        description: "Unable to delete todo. Please check your connection.",
-        variant: "destructive"
-      })
+      toast.error("Unable to delete todo. Please check your connection.")
     }
   }
 
@@ -137,7 +117,6 @@ export default function HomePage() {
             />
           </div>
 
-          {/* Add Todo Form */}
           <AddTodoForm onAdd={handleAddTodo} />
 
           {/* Todo List */}

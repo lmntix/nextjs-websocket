@@ -4,7 +4,6 @@ import { Plus } from "lucide-react"
 import type React from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -31,50 +30,59 @@ export function AddTodoForm({ onAdd }: AddTodoFormProps) {
     setIsExpanded(false)
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      handleSubmit(e)
+    }
+  }
+
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg">Add New Todo</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <Input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="What needs to be done?"
-            onFocus={() => setIsExpanded(true)}
-            className="font-medium"
+    <form onSubmit={handleSubmit} className="space-y-2">
+      <div className="flex gap-2">
+        <Input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Add a new todo..."
+          onFocus={() => setIsExpanded(true)}
+          className="h-9 flex-1"
+        />
+        <Button
+          type="submit"
+          disabled={!title.trim()}
+          size="sm"
+          className="h-9 px-3"
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {isExpanded && (
+        <div className="space-y-2">
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Description (optional)"
+            rows={2}
+            className="text-sm"
           />
-
-          {isExpanded && (
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add a description (optional)"
-              rows={2}
-            />
-          )}
-
-          <div className="flex gap-2">
-            <Button type="submit" disabled={!title.trim()} className="flex-1">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Todo
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setIsExpanded(false)
+                setDescription("")
+              }}
+              className="h-7 px-2 text-xs"
+            >
+              Cancel
             </Button>
-            {isExpanded && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsExpanded(false)
-                  setDescription("")
-                }}
-              >
-                Cancel
-              </Button>
-            )}
           </div>
-        </form>
-      </CardContent>
-    </Card>
+        </div>
+      )}
+    </form>
   )
 }
