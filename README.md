@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Real‑time Todo App (Next.js + Socket.io + PostgreSQL + Drizzle)
 
-## Getting Started
+Minimal full‑stack example:
 
-First, run the development server:
+- Next.js App Router UI
+- Socket.io for realtime
+- PostgreSQL + Drizzle ORM
+- LISTEN/NOTIFY triggers for live updates
+
+### Prerequisites
+
+- Node 20+
+- pnpm
+- A PostgreSQL database (local, Docker, or hosted like Neon/Supabase)
+
+### 1) Install dependencies
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2) Configure environment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Create a `.env` file in the project root:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```env
+# Required by both the app and the socket server
+DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/DBNAME
+# If your provider exposes POSTGRES_URL instead, you can use that; the socket server will accept either
+# POSTGRES_URL=postgres://USER:PASSWORD@HOST:5432/DBNAME
 
-## Learn More
+# Optional
+SOCKET_PORT=3001
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
 
-To learn more about Next.js, take a look at the following resources:
+Notes:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- The socket server explicitly loads `.env`.
+- Next.js automatically reads `.env.local` and `.env.development.local` as well.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 3) Create and migrate the database
 
-## Deploy on Vercel
+Generate migrations from the Drizzle schema and apply them:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+pnpm db:generate
+pnpm db:migrate
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Optional: enable realtime DB notifications (LISTEN/NOTIFY) via SQL scripts:
+
+```bash
+psql "$DATABASE_URL" -f src/scripts/001-create-todos-table.sql -f src/scripts/002-optimize-triggers.sql
+```
+
+### 4) Run the app (two processes)
+
+Terminal 1 (Next.js):
+
+```bash
+pnpm dev
+```
+
+Terminal 2 (Socket.io server):
+
+```bash
+pnpm dev:socket
+```
+
+Open http://localhost:3000
+
+### Available scripts
+
+- Dev (Next.js): `pnpm dev`
+- Dev (Socket server): `pnpm dev:socket`
+- Generate migrations: `pnpm db:generate`
+- Apply migrations: `pnpm db:migrate`
+- Drizzle Studio: `pnpm db:studio`
+
+### Tech overview
+
+- UI: Next.js (App Router), Tailwind CSS
+- Realtime: Socket.io
+- Data: PostgreSQL, Drizzle ORM
+- Realtime flow: DB triggers -> PostgreSQL NOTIFY -> server listens -> broadcasts socket events
+
+### Troubleshooting
+
+- “DATABASE_URL environment variable is required”: ensure `.env` exists at repo root and the value is a valid PostgreSQL connection string.
+- “SASL: client password must be a string”: your `DATABASE_URL` must contain a plain string password (no objects/JSON). Check your provider’s connection string.
