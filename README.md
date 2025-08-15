@@ -1,5 +1,7 @@
 ## Real‑time Todo App (Next.js + Socket.io + PostgreSQL + Drizzle)
 
+![Alt](https://repobeats.axiom.co/api/embed/d8bb69af82cf6f890194dbdde1b4271d1f998834.svg "Repobeats analytics image")
+
 Minimal full‑stack example:
 
 - Next.js App Router UI
